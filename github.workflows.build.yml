@@ -1,0 +1,38 @@
+name: Build APK
+on:
+  workflow_dispatch:
+  push:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find project (unzip if needed)
+        run: |
+          if [ -f KidsWebShell.zip ]; then unzip -oq KidsWebShell.zip; fi
+          F=$(find . -name settings.gradle.kts -not -path './.git/*' | head -n1)
+          echo "settings file: '$F'"
+          if [ -z "$F" ]; then
+            echo "::error::settings.gradle.kts not found. Upload KidsWebShell.zip to the repo root."
+            ls -R | head -50
+            exit 1
+          fi
+          echo "PROJ=$(dirname "$F")" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+      - name: Build debug APK
+        working-directory: ${{ env.PROJ }}
+        run: gradle assembleDebug --no-daemon --stacktrace
+      - name: Show APK location
+        run: find . -name '*.apk' -print
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: '**/build/outputs/apk/debug/*.apk'
+          if-no-files-found: error
